@@ -1,0 +1,116 @@
+<!doctype html>
+<html>
+<head>
+<style>
+    body { margin:0; }
+    canvas { position: absolute; top: 0; left: 0; width:100vw; height:100vh; z-index:-9999; }
+    #fps { padding: 4px; font-size: 0.8em; font-family: Verdana, Geneva, Tahoma, sans-serif; color: #f00; }
+</style>
+<script src="landscape.js"></script>
+<script>
+var landscape;
+var tilt = 0.27;
+var tiltStp = 0.002;
+var aspectRatio = 1;
+
+function hsv2RGB(h, s, v) {
+    var hh = h;
+    if (hh >= 360.0) hh = 0.0;
+    hh /= 60.0;
+    i = Math.floor(hh);
+    var ff = hh - i;
+    var p = v * (1.0 - s);
+    var q = v * (1.0 - (s * ff));
+    var t = v * (1.0 - (s * (1.0 - ff)));
+
+    var out = {r: 0, g: 0, b: 0};
+    switch (i) {
+        case 0: out.r = v; out.g = t; out.b = p; break;
+        case 1: out.r = q; out.g = v; out.b = p; break;
+        case 2: out.r = p; out.g = v; out.b = t; break;
+        case 3: out.r = p; out.g = q; out.b = v; break;
+        case 4: out.r = t; out.g = p; out.b = v; break;
+        case 5:
+        default: out.r = v; out.g = p; out.b = q; break;
+    }
+    return out;  
+}
+
+function ready() {
+    
+    var canvas = document.getElementById('landscapeCanvas');
+    landscape = new Landscape( canvas, 150, 64, 250);
+
+    if (landscape.active) {
+        new Seq( landscape.noise, { rMin: 10, rMax: 60 }, [
+            { name: 0, min: 0, max: 1 }, 
+            { name: 1, min: 0, max: 1 }, 
+            { name: 2, min: 0, max: 1 }
+        ] );
+        
+        new Seq( landscape, { rMin: 30, rMax: 120, delayRange: 10 }, [ { name: "lineCheckRatio", min: 0, max: 1 } ], function(s, v) {
+            ls.lineCheckRatio = v;
+            landscape.lineWidth = 0.04 + (v * 0.46);
+        }, function(s, p, r) {
+            return r < 0.4 ? 0 : r > 0.6 ? 1 : Math.random();
+        });
+        new Seq( landscape, { rMin: 10, rMax: 30 }, [ { name: "zSpeed", min: 0.003, max: 0.0075 } ]);
+        new Seq( landscape.lineColor, { rMin: 10, rMax: 30 }, [ 
+            { name: "hsvH", min: 0, max: 360 },
+            { name: "r", min: 0, max: 1 },
+            { name: "g", min: 0, max: 1 },
+            { name: "b", min: 0, max: 1 }
+        ], null, function(s, p, r) {
+            if (p=='hsvH') {
+                ls.hsvH = r; ls.rgb = hsv2RGB(r, 1 - (landscape.lineCheckRatio * 0.75), 1 - (landscape.lineCheckRatio * 0.25)); return r;
+            }
+            if (p=='r') return ls.rgb.r;
+            if (p=='g') return ls.rgb.g;
+            if (p=='b') return ls.rgb.b;
+        });
+
+        new Seq( landscape, { rMin: 3, rMax: 10, delayRange: 5 }, [ { name: "curve", min: 0, max: 1 } ], null, function(s, p, r) {
+            return r < 0.75 ? 0 : (Math.random() * 150) - 75;
+        });
+        new Seq( landscape, { rMin: 3, rMax: 10, delayRange: 5 }, [ { name: "hill", min: 0, max: 1 } ], null, function(s, p, r) {
+             return r < 0.75 ? 0 : (Math.random() * 100) - 50;
+        });
+        new Seq( landscape.color1, { rMin: 10, rMax: 30 }, [ 
+            { name: "r", min: 0, max: 0.25  },
+            { name: "g", min: 0, max: 0.25 },
+            { name: "b", min: 0, max: 0.25 }
+        ]);
+        new Seq( landscape.color2, { rMin: 10, rMax: 30 }, [ 
+            { name: "r", min: 0.2, max: 0.5 },
+            { name: "g", min: 0.2, max: 0.5 },
+            { name: "b", min: 0.2, max: 0.5 }
+        ]);
+    }
+
+    document.addEventListener('keydown', (event) => {
+        switch (event.code) {
+            case "ArrowUp": ls.viewMatrix[13]-=1; break;
+            case "ArrowDown": ls.viewMatrix[13]+=1; break;
+            case "ArrowLeft": ls.viewMatrix[12]-=1; break;
+            case "ArrowRight": ls.viewMatrix[12]+=1; break;
+            case "Comma": ls.viewMatrix[14]-=1; break;
+            case "Period": ls.viewMatrix[14]+=1; break;
+            case "BracketLeft": tilt+=tiltStp; ls.rotateX(ls.viewMatrix, tiltStp); break;
+            case "BracketRight": tilt-=tiltStp; ls.rotateX(ls.viewMatrix, -tiltStp); break;
+            case "Semicolon": aspectRatio-=0.05; ls.get_projection(ls.fov, aspectRatio, ls.near, ls.far); break;
+            case "Quote": aspectRatio+=0.05; ls.get_projection(ls.fov, aspectRatio, ls.near, ls.far); break;
+
+        }
+        var name = event.code;
+        // Alert the key name and key code on keydown
+        console.log("ViewPosition: key="+event.key+"/"+event.code+" pos="+ls.viewMatrix[12]+"/"+ls.viewMatrix[13]+"/"+ls.viewMatrix[14]+" tilt="+tilt);
+    }, false);
+}
+</script>
+</head>
+<body>
+    <div id="fps"></div>
+    <canvas id = "landscapeCanvas"></canvas>
+    <script> (function() { ready(); })(); </script>
+</body>
+</html>
